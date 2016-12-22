@@ -28,8 +28,9 @@
 
 // SID Control Pins
 
-#define PIN_o2  11  // Not needed with the SwinSID Ultimate?
-#define PIN_RW  12
+#define PIN_o2  10
+#define PIN_RW  11
+#define PIN_RST 12  
 #define PIN_CS  13  // Also shows on the Nano's LED!
 
 void setup(void)
@@ -51,7 +52,11 @@ void setup(void)
   pinModeFast(PIN_A4, OUTPUT);
   pinModeFast(PIN_o2, OUTPUT);
   pinModeFast(PIN_RW, OUTPUT);
+  pinModeFast(PIN_RST,OUTPUT);
   pinModeFast(PIN_CS, OUTPUT);
+
+  // Not resetting (yet)
+  digitalWriteFast(PIN_RST, HIGH);
     
   // Always in WRITE mode (low)
   digitalWriteFast(PIN_RW, LOW);
@@ -59,8 +64,8 @@ void setup(void)
   // Chip select off by default (high)
   digitalWriteFast(PIN_CS, HIGH);
   
-  // For a real SID we would start a 1 MHz clock here.  Skipped for SwinSID Ultimate, leave it low.
-  digitalWriteFast(PIN_o2, LOW);
+  // Start the 1 MHz Clock
+  StartClock();
 
   // Serial debugging
   Serial.begin(115200);
@@ -71,10 +76,7 @@ void setup(void)
 
 void loop()
 {
-  Serial.println("Ping!");
-
   // Simple test
-
 
   /* BASIC example
     30 POKE S + 1, 130
@@ -86,6 +88,7 @@ void loop()
     90 FOR T = 1 TO 1000 : NEXT : NEXT
   */
   
+  Serial.println("Ping!");
   Poke(1, 130);
   Poke(5, 9);
   Poke(15, 30);
@@ -96,11 +99,30 @@ void loop()
 
   delay(3000);
 
-  Serial.println("Silence...");
-  Poke(24, 0);
-  delay(2000);
+ // Serial.println("Silence...");
+ // Poke(24, 0);
+ // delay(1000);
 }
 
+
+void StartClock()
+{
+  // Copied from the SIDaster project:
+  // 1MHz generation on OC1A - Clk 16 MHz - set pin 10 as OC1A output
+  // Reset settings of Timer/Counter register 1
+  // Set compare match output A to toogle
+  // Set waveform generation mode to CTC (Clear Counter on Match)
+  // Set clock select to clock/1024 (from prescaler)
+  // Set output compare register A to 8 (i.e. OC1A Toggle every 7+1=8 Clk pulses)
+  pinMode(PIN_o2, OUTPUT);
+  TCCR1A &= ~((1 << COM1B1) | (1 << COM1B0) | (1 << WGM11) | (1 << WGM10));
+  TCCR1B &= ~((1 << WGM13) | (1 << WGM12) | (1 << CS12) | (1 << CS11) | (1 << CS10));
+  TCCR1A |= (0 << COM1B1) | (1 << COM1B0);
+  TCCR1A |= (0 << WGM11) | (0 << WGM10);
+  TCCR1B |= (0 << WGM13) | (1 << WGM12);
+  TCCR1B |= (0 << CS12) | (0 << CS11) | (1 << CS10);
+  OCR1A = 7;
+}
 
 
 // SID interface functions 
@@ -111,12 +133,11 @@ void loop()
 
 void Reset()
 {
-   // TODO: Reset signal
-  //delayMicroseconds(20000);
-  //digitalWrite(13, LOW);
-  //delayMicroseconds(20000);
-  digitalWrite(13, HIGH);
-  delayMicroseconds(20000);
+  // Reset signal
+  digitalWrite(PIN_RST, LOW);
+  delayMicroseconds(2000);
+  digitalWrite(PIN_RST, HIGH);
+  delayMicroseconds(2000);
 
   // Reset SID registers (0..24 are write-only and 25...28 are read-only)
   for (int addr = 0; addr < 25; addr++)
@@ -154,7 +175,7 @@ void Poke(unsigned int address, byte value)
   digitalWriteFast(PIN_CS, LOW);
 
   // Delay a couple of clock cycles or so
-  delayMicroseconds(20000);
+  delayMicroseconds(200);
 
   // Disable SID
   digitalWriteFast(PIN_CS, HIGH);
