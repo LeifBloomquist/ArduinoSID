@@ -92,18 +92,24 @@ void setup(void)
 
 void loop()
 {
-  for (int v = 0; v <= 2; v++)
-  {   
-    setADSR(v, 0, 0, 15, 11);
-    setFrequency(v, 1000*(v+1));
-    setWaveform(v, SID_PULSE, true);
-    for (int t = 0; t < 1500; t++)
-    {
-      setPulse(v, t);
-    }
-    setWaveform(v, SID_PULSE, false);
-    delay(200);
-  }
+  setADSR(0, 0, 0, 15, 11);
+  setFrequency(0, 1024);
+  setWaveform(0, SID_PULSE, true);
+  setPulse(0, 2048);
+
+  setADSR(1, 0, 0, 15, 11);
+  setFrequency(1, 1025);
+  setWaveform(1, SID_PULSE, true);
+  setPulse(1, 2048);
+
+  /*
+  setADSR(2, 0, 0, 15, 11);
+  setFrequency(2, 511);
+  setWaveform(2, SID_PULSE, true);
+  setPulse(2, 1024);
+  */
+
+  while (1) {};
 }
 
 
@@ -170,9 +176,6 @@ void setWaveform(byte voice, byte waveform, bool gate)
 
 void StartClock()
 {
-  //analogWrite(PIN_o2, 127);
-  //return;
-
   // Copied from the SIDaster project:
   // 1MHz generation on OC1A - Clk 16 MHz - set pin 10 as OC1A output
   // Reset settings of Timer/Counter register 1
