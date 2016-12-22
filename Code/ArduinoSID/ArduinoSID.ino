@@ -72,41 +72,39 @@ void setup(void)
 
   // Reset the SID before we start.
   Reset();
+
+  delay(1000);  
+  Poke(24, 15);
 }
 
 void loop()
 {
-  // Simple test
+  Serial.println("Playing!"); 
 
-  /* BASIC example
-    30 POKE S + 1, 130
-    40 POKE S + 5, 9
-    50 POKE S + 15, 30
-    60 POKE S + 24, 15
-    70 FOR L = 1 TO 12 : POKE S + 4, 21
-    80 FOR T = 1 TO 1000 : NEXT : POKE S + 4, 20
-    90 FOR T = 1 TO 1000 : NEXT : NEXT
-  */
+  int base=7;
   
-  Serial.println("Ping!");
-  Poke(1, 130);
-  Poke(5, 9);
-  Poke(15, 30);
-  Poke(24, 15);
-  Poke(4, 21);
-  delay(100);
-  Poke(4, 20);
-
-  delay(3000);
-
- // Serial.println("Silence...");
- // Poke(24, 0);
- // delay(1000);
+  Poke(base + 5, 190);
+  Poke(base + 6, 248);
+  Poke(base + 1, 5);
+  Poke(base + 0, 10);
+  Poke(base + 4, 129);
+       
+  while (1)
+  {
+     for (int t=0; t < 25; t++)
+     {
+       Poke(base+1, t);
+       delay(100);
+     }
+  }
 }
 
 
 void StartClock()
-{
+{ 
+  //analogWrite(PIN_o2, 127);
+  //return;
+
   // Copied from the SIDaster project:
   // 1MHz generation on OC1A - Clk 16 MHz - set pin 10 as OC1A output
   // Reset settings of Timer/Counter register 1
@@ -129,7 +127,7 @@ void StartClock()
 // Thanks to A.T.Brask for the idea for these functions
 // https://github.com/atbrask/RealSIDShield
 //
-// Also see https://github.com/CharlotteGore/MOS6581/
+// Also see https://github.com/CharlotteGore/MOS6581/, a different approach
 
 void Reset()
 {
@@ -149,19 +147,26 @@ void Reset()
 void Poke(unsigned int address, byte value)
 {
   // Hack to make this work with either original or offset addresses
-  if (address > 0xD400) address -= 0xD400;
+  //if (address > 0xD400) address -= 0xD400;
 
   // Disable SID
+  // PORTB |= B00000100;
   digitalWriteFast(PIN_CS, HIGH);
 
   // Put address on bus.  TODO, use port C register
+  // PORTC = address & B00011111;
+  
   digitalWriteFast(PIN_A0, bitRead(address, 0));
   digitalWriteFast(PIN_A1, bitRead(address, 1));
   digitalWriteFast(PIN_A2, bitRead(address, 2));
   digitalWriteFast(PIN_A3, bitRead(address, 3));
   digitalWriteFast(PIN_A4, bitRead(address, 4));
+ 
 
   // Put data on bus.  TODO, use port B/D registers
+  // PORTB |= (value & B00000011);
+  // PORTD |= (value & B11111100);
+ 
   digitalWriteFast(PIN_D0, bitRead(value, 0));
   digitalWriteFast(PIN_D1, bitRead(value, 1));
   digitalWriteFast(PIN_D2, bitRead(value, 2));
@@ -171,13 +176,16 @@ void Poke(unsigned int address, byte value)
   digitalWriteFast(PIN_D6, bitRead(value, 6));
   digitalWriteFast(PIN_D7, bitRead(value, 7));
 
+
   // Enable SID
+  // PORTB &= B11111011;
   digitalWriteFast(PIN_CS, LOW);
 
   // Delay a couple of clock cycles or so
-  delayMicroseconds(200);
+  delayMicroseconds(2);
 
   // Disable SID
+  // PORTB |= B00000100;
   digitalWriteFast(PIN_CS, HIGH);
 }
 
