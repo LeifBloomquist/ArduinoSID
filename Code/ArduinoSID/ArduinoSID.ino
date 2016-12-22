@@ -33,6 +33,19 @@
 #define PIN_RST 12  
 #define PIN_CS  13  // Also shows on the Nano's LED!
 
+// Lookup between voice and base address.  Note voices are zero-indexed!
+byte baseaddr[] = { 0, 7, 14 };
+
+// Waveforms
+#define SID_NOISE     128
+#define SID_PULSE     64
+#define SID_SAWTOOTH  32
+#define SID_TRIANGLE  16
+#define SID_TEST		  8
+#define SID_RING		  20
+#define SID_SYNC		  66
+#define SID_OFF		  	0
+
 void setup(void)
 {
    // All outputs.  TODO, use port registers directly  (this is a lazy hack)
@@ -73,38 +86,90 @@ void setup(void)
   // Reset the SID before we start.
   Reset();
 
-  delay(1000);  
-  Poke(24, 15);
+  // Full Volume!
+  setVolume(15); 
 }
 
 void loop()
 {
-  Serial.println("Playing!"); 
-
-  int base=7;
-  
-  Poke(base + 5, 190);  // Attack/Decay
-  Poke(base + 6, 248);  // Sustain/Release
-  Poke(base + 1, 5);    // Frequency High
-  Poke(base + 0, 10);   // Frequency Low
-  Poke(base + 4, 17);   // Waveform
-  Poke(base + 3, 1);    // Pulse width
-
-       
-  while (1)
-  {
-     for (int t=0; t < 255; t++)
-     {       
-       Poke(base+1, t);
-       Serial.println(t);
-       delay(500);
-     }
+  for (int v = 0; v <= 2; v++)
+  {   
+    setADSR(v, 0, 0, 15, 11);
+    setFrequency(v, 1000*(v+1));
+    setWaveform(v, SID_PULSE, true);
+    for (int t = 0; t < 1500; t++)
+    {
+      setPulse(v, t);
+    }
+    setWaveform(v, SID_PULSE, false);
+    delay(200);
   }
 }
 
 
+// -----------------------------------------------------------------------------------------------------------
+
+
+// SID Control functions inspired by Charlotte Gore https://github.com/CharlotteGore/MOS6581/
+
+void setVolume(byte volume)
+{
+  Poke(24, volume & 0xF);
+}
+
+void setADSR(byte voice, byte a, byte d, byte s, byte r)
+{
+  int base = baseaddr[voice];
+
+  a &= 0xF;
+  d &= 0xF;
+  s &= 0xF;
+  r &= 0xF;
+
+  Poke(base + 5, (a << 4) + d);
+  Poke(base + 6, (s << 4) + r);
+}
+
+void setPulse(byte voice, uint16_t rate)
+{
+  int base = baseaddr[voice];
+
+  byte hi = highByte(rate) & 0xF;
+  byte lo = lowByte(rate);
+
+  Poke(base + 2, lo);
+  Poke(base + 3, hi);
+}
+
+void setFrequency(byte voice, uint16_t frequency)
+{
+  int base = baseaddr[voice];
+
+  byte hi = highByte(frequency);
+  byte lo = lowByte(frequency);
+
+  Poke(base + 0, lo);
+  Poke(base + 1, hi);
+}
+
+void setWaveform(byte voice, byte waveform, bool gate)
+{
+  int base = baseaddr[voice];
+
+  if (gate) waveform |= 0x01;
+
+  Poke(base + 4, waveform);
+}
+
+
+// -----------------------------------------------------------------------------------------------------------
+
+// SID interface functions 
+// Thanks to A.T.Brask for the idea for these functions
+// https://github.com/atbrask/RealSIDShield
+
 void StartClock()
-{ 
+{
   //analogWrite(PIN_o2, 127);
   //return;
 
@@ -125,13 +190,6 @@ void StartClock()
   OCR1A = 7;
 }
 
-
-// SID interface functions 
-// Thanks to A.T.Brask for the idea for these functions
-// https://github.com/atbrask/RealSIDShield
-//
-// Also see https://github.com/CharlotteGore/MOS6581/, a different approach
-
 void Reset()
 {
   // Reset signal
@@ -145,7 +203,10 @@ void Reset()
   {
     Poke(addr, 0);
   }
+
+  delay(100);  // Not sure why this is needed?
 }
+
 
 void Poke(unsigned int address, byte value)
 {
@@ -153,23 +214,16 @@ void Poke(unsigned int address, byte value)
   //if (address > 0xD400) address -= 0xD400;
 
   // Disable SID
-  // PORTB |= B00000100;
   digitalWriteFast(PIN_CS, HIGH);
 
-  // Put address on bus.  TODO, use port C register
-  // PORTC = address & B00011111;
-  
+  // Put address on bus.  TODO, use port C register  
   digitalWriteFast(PIN_A0, bitRead(address, 0));
   digitalWriteFast(PIN_A1, bitRead(address, 1));
   digitalWriteFast(PIN_A2, bitRead(address, 2));
   digitalWriteFast(PIN_A3, bitRead(address, 3));
   digitalWriteFast(PIN_A4, bitRead(address, 4));
  
-
   // Put data on bus.  TODO, use port B/D registers
-  // PORTB |= (value & B00000011);
-  // PORTD |= (value & B11111100);
- 
   digitalWriteFast(PIN_D0, bitRead(value, 0));
   digitalWriteFast(PIN_D1, bitRead(value, 1));
   digitalWriteFast(PIN_D2, bitRead(value, 2));
@@ -179,16 +233,13 @@ void Poke(unsigned int address, byte value)
   digitalWriteFast(PIN_D6, bitRead(value, 6));
   digitalWriteFast(PIN_D7, bitRead(value, 7));
 
-
   // Enable SID
-  // PORTB &= B11111011;
   digitalWriteFast(PIN_CS, LOW);
 
-  // Delay a couple of clock cycles or so
-  delayMicroseconds(2);
+  // Delay a clock cycles or so
+  delayMicroseconds(1);
 
   // Disable SID
-  // PORTB |= B00000100;
   digitalWriteFast(PIN_CS, HIGH);
 }
 
