@@ -83,18 +83,21 @@ void loop()
 
   int base=7;
   
-  Poke(base + 5, 190);
-  Poke(base + 6, 248);
-  Poke(base + 1, 5);
-  Poke(base + 0, 10);
-  Poke(base + 4, 129);
+  Poke(base + 5, 190);  // Attack/Decay
+  Poke(base + 6, 248);  // Sustain/Release
+  Poke(base + 1, 5);    // Frequency High
+  Poke(base + 0, 10);   // Frequency Low
+  Poke(base + 4, 17);   // Waveform
+  Poke(base + 3, 1);    // Pulse width
+
        
   while (1)
   {
-     for (int t=0; t < 25; t++)
-     {
+     for (int t=0; t < 255; t++)
+     {       
        Poke(base+1, t);
-       delay(100);
+       Serial.println(t);
+       delay(500);
      }
   }
 }
@@ -172,7 +175,7 @@ void Poke(unsigned int address, byte value)
   digitalWriteFast(PIN_D2, bitRead(value, 2));
   digitalWriteFast(PIN_D3, bitRead(value, 3));
   digitalWriteFast(PIN_D4, bitRead(value, 4));
-  digitalWriteFast(PIN_D6, bitRead(value, 5));
+  digitalWriteFast(PIN_D5, bitRead(value, 5));
   digitalWriteFast(PIN_D6, bitRead(value, 6));
   digitalWriteFast(PIN_D7, bitRead(value, 7));
 
