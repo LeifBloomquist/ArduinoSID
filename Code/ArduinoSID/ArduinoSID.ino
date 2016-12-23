@@ -37,6 +37,7 @@
 byte baseaddr[] = { 0, 7, 14 };
 
 // Waveforms
+
 #define SID_NOISE     128
 #define SID_PULSE     64
 #define SID_SAWTOOTH  32
@@ -45,6 +46,16 @@ byte baseaddr[] = { 0, 7, 14 };
 #define SID_RING		  20
 #define SID_SYNC		  66
 #define SID_OFF		  	0
+
+// Filter Modes
+
+#define FILTER_LP    16
+#define FILTER_BP    32
+#define FILTER_HP    64
+#define FILTER_3OFF  128
+
+// Maintain a local copy of the volume register
+byte d418_mirror = 0;
 
 void setup(void)
 {
@@ -92,15 +103,21 @@ void setup(void)
 
 void loop()
 {
+  Serial.println("Loop");
+
   setADSR(0, 0, 0, 15, 11);
-  setFrequency(0, 1024);
-  setWaveform(0, SID_PULSE, true);
+  setFrequency(0, 768);
+  setWaveform(0, SID_SAWTOOTH, true);
   setPulse(0, 2048);
 
   setADSR(1, 0, 0, 15, 11);
-  setFrequency(1, 1025);
-  setWaveform(1, SID_PULSE, true);
+  setFrequency(1, 778);
+  setWaveform(1, SID_SAWTOOTH, true);
   setPulse(1, 2048);
+
+  setFilter(0, true, true, false, false);
+  setFilterMode(FILTER_LP);
+  setFilterCutoff(32);
 
   /*
   setADSR(2, 0, 0, 15, 11);
@@ -110,6 +127,14 @@ void loop()
   */
 
   while (1) {};
+
+  for (int t = 1 ; t < 15; t++)
+  {
+    //setFilterCutoff(t);
+    setFilter(t, true, true, true, false);
+    Serial.println(t);
+    delay(1000);
+  }
 }
 
 
@@ -120,7 +145,9 @@ void loop()
 
 void setVolume(byte volume)
 {
-  Poke(24, volume & 0xF);
+  d418_mirror = (d418_mirror & 0xF0) | (volume & 0x0F);
+
+  Poke(24, d418_mirror);
 }
 
 void setADSR(byte voice, byte a, byte d, byte s, byte r)
@@ -140,7 +167,7 @@ void setPulse(byte voice, uint16_t rate)
 {
   int base = baseaddr[voice];
 
-  byte hi = highByte(rate) & 0xF;
+  byte hi = highByte(rate) & 0x0F;
   byte lo = lowByte(rate);
 
   Poke(base + 2, lo);
@@ -166,6 +193,47 @@ void setWaveform(byte voice, byte waveform, bool gate)
 
   Poke(base + 4, waveform);
 }
+
+void setFilter(byte resonance, bool voice1, bool voice2, bool voice3, bool ext)
+{
+  resonance &= 0x0F;
+
+  byte value = (resonance << 4) |
+               (ext << 3) |
+               (voice3 << 2) |
+               (voice2 << 1) |
+               (voice1 << 0);
+
+  Poke(23, value);
+}
+
+void setFilterCutoff(uint16_t frequency)
+{
+  frequency &= 0x7FF;
+
+  Serial.print("frequency=");
+  Serial.println(frequency);
+
+  byte lo = frequency & 0x0F;   // Only lower 4 bits are used in $D415
+  byte hi = frequency >> 4;  
+
+  Serial.print("lo=");
+  Serial.println(lo);
+
+  Serial.print("hi=");
+  Serial.println(hi);
+
+  Poke(21, lo);
+  Poke(22, hi);
+}
+
+void setFilterMode(byte mode)
+{
+  d418_mirror = (mode & 0xF0) | (d418_mirror & 0x0F);
+
+  Poke(24, d418_mirror);
+}
+
 
 
 // -----------------------------------------------------------------------------------------------------------
@@ -239,8 +307,8 @@ void Poke(unsigned int address, byte value)
   // Enable SID
   digitalWriteFast(PIN_CS, LOW);
 
-  // Delay a clock cycles or so
-  delayMicroseconds(1);
+  // Delay a couple of clock cycles or so
+  delayMicroseconds(2);
 
   // Disable SID
   digitalWriteFast(PIN_CS, HIGH);
