@@ -87,8 +87,8 @@ void MIDIsetup()
   // Connect the functions to the library, 
   MIDI.setHandleNoteOn(HandleNoteOn);    // Put only the name of the function
   MIDI.setHandleNoteOff(HandleNoteOff);
+  MIDI.setHandleControlChange(HandleControlChange);
 }
-
 
 // main loop
 void loop()
@@ -98,23 +98,24 @@ void loop()
 }
 
 
-
 // -----------------------------------------------------------------------------
 void HandleNoteOn(byte channel, byte note, byte velocity)
 {
   // Filter channels
-  if (channel > MAX_CHANNELS) return;
+  if (channel > MAX_CHANNELS) return;  
 
+  // This acts like a NoteOff.
   if (velocity == 0)
   {
-    // This acts like a NoteOff.
     HandleNoteOff(channel, note, velocity);
     return;
   }
 
+  byte voice = channel - 1;
+
   int frequency = note * 20;  //  TODO, lookup table
-  setFrequency(channel - 1, frequency);
-  setWaveform(channel - 1, SID_SAWTOOTH, true);
+  setFrequency(voice, frequency);
+  setWaveform(voice, SID_PULSE, true);
 }
 
 // -----------------------------------------------------------------------------
@@ -122,11 +123,47 @@ void HandleNoteOff(byte channel, byte note, byte velocity)
 {
   // Filter channels
   if (channel > MAX_CHANNELS) return;
+
+  byte voice = channel - 1;
  
-  setWaveform(channel - 1, SID_SAWTOOTH, false);
+  setWaveform(voice, SID_PULSE, false);
 }
 
 
+
+void HandleControlChange(byte channel, byte number, byte value)
+{
+   // Filter channels
+   if (channel > MAX_CHANNELS) return;
+
+   byte voice = channel - 1;
+
+   switch (number)
+   {
+      case 0:  // Filter cutoff
+        setFilterCutoff(value * 16);
+        break;
+
+      case 1:  // Pulse Width
+        setPulse(voice, value * 16);
+        break;
+
+      case 2:  // Resonance
+        setFilter(value >> 4, true, true, true, false);
+        break;
+
+      case 7:  // Volume
+        setVolume(value >> 4);
+        break;
+   
+      default:
+        break;
+   }
+
+}
+
+
+// -------------------------------------------------------------------------------------------------------------
 
 void SIDsetup(void)
 {
@@ -169,9 +206,9 @@ void SIDsetup(void)
   setVolume(15);
 
   // ADSR for all voices
-  setADSR(0, 2, 1, 15, 5);
-  setADSR(1, 2, 1, 15, 5);
-  setADSR(2, 2, 1, 15, 5);
+  setADSR(0, 1, 1, 15, 9);
+  setADSR(1, 1, 1, 15, 9);
+  setADSR(2, 1, 1, 15, 9);
 
   setFrequency(0, 0);
 
@@ -180,9 +217,9 @@ void SIDsetup(void)
   setPulse(1, 2048);
   setPulse(2, 2048);
 
-  setFilter(0, false, false, false, false);
-  //setFilterMode(FILTER_LP);
-  //setFilterCutoff(5000);
+  setFilter(0, true, true, true, false);
+  setFilterMode(FILTER_LP);
+  setFilterCutoff(15000);
 }
 
 
@@ -259,17 +296,8 @@ void setFilterCutoff(uint16_t frequency)
 {
   frequency &= 0x7FF;
 
-  Serial.print("frequency=");
-  Serial.println(frequency);
-
   byte lo = frequency & 0x0F;   // Only lower 4 bits are used in $D415
   byte hi = frequency >> 4;
-
-  Serial.print("lo=");
-  Serial.println(lo);
-
-  Serial.print("hi=");
-  Serial.println(hi);
 
   Poke(21, lo);
   Poke(22, hi);
