@@ -79,6 +79,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="SIDLookup.h" />
     <ClInclude Include="__vm\.ArduinoSIDMIDI.vsarduino.h" />
   </ItemGroup>
   <PropertyGroup>

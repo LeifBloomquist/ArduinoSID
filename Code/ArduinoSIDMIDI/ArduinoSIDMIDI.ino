@@ -1,5 +1,5 @@
 // -------------------------------------------------------------
-// Arduino Nano control of a SID.  (Actuall, a SwinSID Ultimate)
+// Arduino Nano control of a SID.  (Actually, a SwinSID Ultimate)
 // By Leif Bloomquist
 // 
 // Many thanks to Jeroen Janmaat for the online tutorials!  
@@ -9,6 +9,7 @@
 
 #include <digitalWriteFast.h>
 #include <MIDI.h>
+#include "SIDLookup.h"
 
 // MIDI Defines ---------------------------------------------------------------------------------------
 
@@ -113,7 +114,9 @@ void HandleNoteOn(byte channel, byte note, byte velocity)
 
   byte voice = channel - 1;
 
-  int frequency = note * 20;  //  TODO, lookup table
+  note &= 0x7F;
+
+  int frequency = note_to_freq[note];
   setFrequency(voice, frequency);
   setWaveform(voice, SID_PULSE, true);
 }
